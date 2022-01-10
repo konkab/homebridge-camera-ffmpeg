@@ -11,6 +11,12 @@
       "placeholder": "Camera Name",
       "default": "Camera FFmpeg"
     },
+    "authorizationHeader": {
+      "title": "Authorization Header",
+      "type": "string",
+      "placeholder": "Bearer MHAT17b15ccc-1a13-4623-8a21-472ecfb21f45",
+      "default": "Bearer MHAT17b15ccc-1a13-4623-8a21-472ecfb21f45"
+    },
     "videoProcessor": {
       "title": "Video Processor",
       "type": "string",
@@ -61,6 +67,13 @@
         "title": "Cameras",
         "type": "object",
         "properties": {
+          "id": {
+            "title": "Camera ID",
+            "type": "string",
+            "placeholder": "0000000",
+            "required": true,
+            "description": "Camera ID."
+          },
           "name": {
             "title": "Name",
             "type": "string",
@@ -126,18 +139,6 @@
             "title": "Video Configuration",
             "type": "object",
             "properties": {
-              "source": {
-                "title": "Video Source",
-                "type": "string",
-                "placeholder": "-i rtsp://username:password@example.com:554",
-                "required": true,
-                "description": "FFmpeg options on where to find and how to decode your camera's video stream. The most basic form is '-i' followed by your camera's URL."
-              },
-              "stillImageSource": {
-                "title": "Still Image Source",
-                "type": "string",
-                "description": "If your camera also provides a URL for a still image, that can be defined here with the same syntax as 'source'. If not set, the plugin will grab one frame from 'source'."
-              },
               "returnAudioTarget": {
                 "title": "Two-way Audio Target (EXPERIMENTAL - WIP)",
                 "type": "string",
@@ -306,9 +307,8 @@
           "orderable": false,
           "buttonText": "Add Camera",
           "items": [
+            "cameras[].id",
             "cameras[].name",
-            "cameras[].videoConfig.source",
-            "cameras[].videoConfig.stillImageSource",
             "cameras[].videoConfig.audio",
             "cameras[].unbridge",
             {
@@ -436,6 +436,7 @@
       "expandable": true,
       "expanded": false,
       "items": [
+        "authorizationHeader",
         "videoProcessor"
       ]
     }

@@ -58,21 +58,6 @@ class FfmpegPlatform implements DynamicPlatformPlugin {
         this.log.error('The videoConfig section is missing from the config. This camera will be skipped.', cameraConfig.name);
         error = true;
       } else {
-        if (!cameraConfig.videoConfig.source) {
-          this.log.error('There is no source configured for this camera. This camera will be skipped.', cameraConfig.name);
-          error = true;
-        } else {
-          const sourceArgs = cameraConfig.videoConfig.source.split(/\s+/);
-          if (!sourceArgs.includes('-i')) {
-            this.log.warn('The source for this camera is missing "-i", it is likely misconfigured.', cameraConfig.name);
-          }
-        }
-        if (cameraConfig.videoConfig.stillImageSource) {
-          const stillArgs = cameraConfig.videoConfig.stillImageSource.split(/\s+/);
-          if (!stillArgs.includes('-i')) {
-            this.log.warn('The stillImageSource for this camera is missing "-i", it is likely misconfigured.', cameraConfig.name);
-          }
-        }
         if (cameraConfig.videoConfig.vcodec === 'copy' && cameraConfig.videoConfig.videoFilter) {
           this.log.warn('A videoFilter is defined, but the copy vcodec is being used. This will be ignored.', cameraConfig.name);
         }
@@ -164,7 +149,7 @@ class FfmpegPlatform implements DynamicPlatformPlugin {
       }
     }
 
-    const delegate = new StreamingDelegate(this.log, cameraConfig, this.api, hap, this.config.videoProcessor);
+    const delegate = new StreamingDelegate(this.log, cameraConfig, this.api, hap, this.config);
 
     accessory.configureController(delegate.controller);
 
@@ -333,7 +318,7 @@ class FfmpegPlatform implements DynamicPlatformPlugin {
   didFinishLaunching(): void {
     for (const [uuid, cameraConfig] of this.cameraConfigs) {
       if (cameraConfig.unbridge) {
-        const accessory = new Accessory(cameraConfig.name!, uuid);
+        const accessory = new Accessory(cameraConfig.name!, uuid, hap.Categories.VIDEO_DOORBELL);
         this.log.info('Configuring unbridged accessory...', accessory.displayName);
         this.setupAccessory(accessory, cameraConfig);
         this.api.publishExternalAccessories(PLUGIN_NAME, [accessory]);
@@ -341,7 +326,7 @@ class FfmpegPlatform implements DynamicPlatformPlugin {
       } else {
         const cachedAccessory = this.cachedAccessories.find((curAcc: PlatformAccessory) => curAcc.UUID === uuid);
         if (!cachedAccessory) {
-          const accessory = new Accessory(cameraConfig.name!, uuid);
+          const accessory = new Accessory(cameraConfig.name!, uuid, hap.Categories.VIDEO_DOORBELL);
           this.log.info('Configuring bridged accessory...', accessory.displayName);
           this.setupAccessory(accessory, cameraConfig);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);

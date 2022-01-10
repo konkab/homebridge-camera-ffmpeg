@@ -3,6 +3,7 @@ import { PlatformIdentifier, PlatformName } from 'homebridge';
 export type FfmpegPlatformConfig = {
   platform: PlatformName | PlatformIdentifier;
   name?: string;
+  authorizationHeader: string;
   videoProcessor?: string;
   mqtt?: string;
   portmqtt?: number;
@@ -15,6 +16,7 @@ export type FfmpegPlatformConfig = {
 };
 
 export type CameraConfig = {
+  id?: string;
   name?: string;
   manufacturer?: string;
   model?: string;
@@ -31,8 +33,6 @@ export type CameraConfig = {
 };
 
 export type VideoConfig = {
-  source?: string;
-  stillImageSource?: string;
   returnAudioTarget?: string;
   maxStreams?: number;
   maxWidth?: number;

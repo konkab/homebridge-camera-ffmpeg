@@ -23,9 +23,10 @@ import { spawn } from 'child_process';
 import { createSocket, Socket } from 'dgram';
 import ffmpegPath from 'ffmpeg-for-homebridge';
 import pickPort, { pickPortOptions } from 'pick-port';
-import { CameraConfig, VideoConfig } from './configTypes';
+import { CameraConfig, FfmpegPlatformConfig, VideoConfig } from './configTypes';
 import { FfmpegProcess } from './ffmpeg';
 import { Logger } from './logger';
+import axios from 'axios';
 
 type SessionInfo = {
   address: string; // address of the HAP controller
@@ -63,9 +64,11 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   private readonly hap: HAP;
   private readonly log: Logger;
   private readonly cameraName: string;
+  private readonly cameraId: string;
   private readonly unbridge: boolean;
   private readonly videoConfig: VideoConfig;
   private readonly videoProcessor: string;
+  private readonly authorizationHeader: string;
   readonly controller: CameraController;
   private snapshotPromise?: Promise<Buffer>;
 
@@ -74,14 +77,16 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   ongoingSessions: Map<string, ActiveSession> = new Map();
   timeouts: Map<string, NodeJS.Timeout> = new Map();
 
-  constructor(log: Logger, cameraConfig: CameraConfig, api: API, hap: HAP, videoProcessor?: string) { // eslint-disable-line @typescript-eslint/explicit-module-boundary-types
+  constructor(log: Logger, cameraConfig: CameraConfig, api: API, hap: HAP, platformConfig: FfmpegPlatformConfig) { // eslint-disable-line @typescript-eslint/explicit-module-boundary-types
     this.log = log;
     this.hap = hap;
 
     this.cameraName = cameraConfig.name!;
+    this.cameraId = cameraConfig.id!;
     this.unbridge = cameraConfig.unbridge ?? false;
     this.videoConfig = cameraConfig.videoConfig!;
-    this.videoProcessor = videoProcessor || ffmpegPath || 'ffmpeg';
+    this.videoProcessor = platformConfig.videoProcessor || ffmpegPath || 'ffmpeg';
+    this.authorizationHeader = platformConfig.authorizationHeader;
 
     api.on(APIEvent.SHUTDOWN, () => {
       for (const session in this.ongoingSessions) {
@@ -167,18 +172,23 @@ export class StreamingDelegate implements CameraStreamingDelegate {
     return resInfo;
   }
 
-  fetchSnapshot(snapFilter?: string): Promise<Buffer> {
+  fetchSnapshot(request: SnapshotRequest, snapFilter?: string): Promise<Buffer> {
     this.snapshotPromise = new Promise((resolve, reject) => {
+      const stillImageSource = `-i https://api-mh.ertelecom.ru/rest/v1/forpost/cameras/${this.cameraId}/snapshots?width=${request.width}&height=${request.height}`;
+
       const startTime = Date.now();
-      const ffmpegArgs = (this.videoConfig.stillImageSource || this.videoConfig.source!) + // Still
+      const ffmpegArgs = stillImageSource + // Still
         ' -frames:v 1' +
         (snapFilter ? ' -filter:v ' + snapFilter : '') +
         ' -f image2 -' +
         ' -hide_banner' +
         ' -loglevel error';
 
+      let ffmpegArgsArray = ffmpegArgs.split(/\s+/);
+      ffmpegArgsArray = ['-headers', `Authorization: ${this.authorizationHeader}`].concat(ffmpegArgsArray);
+
       this.log.debug('Snapshot command: ' + this.videoProcessor + ' ' + ffmpegArgs, this.cameraName, this.videoConfig.debug);
-      const ffmpeg = spawn(this.videoProcessor, ffmpegArgs.split(/\s+/), { env: process.env });
+      const ffmpeg = spawn(this.videoProcessor, ffmpegArgsArray, { env: process.env });
 
       let snapshotBuffer = Buffer.alloc(0);
       ffmpeg.stdout.on('data', (data) => {
@@ -258,7 +268,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
       this.log.debug('Snapshot requested: ' + request.width + ' x ' + request.height,
         this.cameraName, this.videoConfig.debug);
 
-      const snapshot = await (this.snapshotPromise || this.fetchSnapshot(resolution.snapFilter));
+      const snapshot = await (this.snapshotPromise || this.fetchSnapshot(request, resolution.snapFilter));
 
       this.log.debug('Sending snapshot: ' + (resolution.width > 0 ? resolution.width : 'native') + ' x ' +
         (resolution.height > 0 ? resolution.height : 'native') +
@@ -323,7 +333,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
     callback(undefined, response);
   }
 
-  private startStream(request: StartStreamRequest, callback: StreamRequestCallback): void{
+  private async startStream(request: StartStreamRequest, callback: StreamRequestCallback): Promise<void>{
     const sessionInfo = this.pendingSessions.get(request.sessionID);
     if (sessionInfo) {
       const vcodec = this.videoConfig.vcodec || 'libx264';
@@ -357,7 +367,15 @@ export class StreamingDelegate implements CameraStreamingDelegate {
         ' fps, ' + (videoBitrate > 0 ? videoBitrate : '???') + ' kbps' +
         (this.videoConfig.audio ? (' (' + request.audio.codec + ')') : ''), this.cameraName);
 
-      let ffmpegArgs = this.videoConfig.source!;
+      const response = await axios({
+        'method': 'GET',
+        'url': `https://api-mh.ertelecom.ru/rest/v1/forpost/cameras/${this.cameraId}/video?LightStream=0`,
+        'headers': {'Authorization': this.authorizationHeader}
+      })
+
+      const source = response.data['data']['URL']
+
+      let ffmpegArgs = `-i ${source}`;
 
       ffmpegArgs += // Video
         (this.videoConfig.mapvideo ? ' -map ' + this.videoConfig.mapvideo : ' -an -sn -dn') +

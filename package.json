@@ -1,6 +1,6 @@
 {
-  "displayName": "Homebridge Camera FFmpeg",
-  "name": "homebridge-camera-ffmpeg",
+  "displayName": "Электронный город: Мой дом",
+  "name": "homebridge-novotelecom-camera",
   "version": "3.1.3",
   "description": "Homebridge Plugin Providing FFmpeg-based Camera Support",
   "main": "dist/index.js",
@@ -69,8 +69,11 @@
     "typescript": "^4.3.5"
   },
   "dependencies": {
+    "@types/request": "^2.48.7",
+    "axios": "^0.24.0",
     "ffmpeg-for-homebridge": "^0.0.9",
     "mqtt": "^4.2.8",
-    "pick-port": "^1.0.0"
+    "pick-port": "^1.0.0",
+    "request": "^2.88.0"
   }
 }
